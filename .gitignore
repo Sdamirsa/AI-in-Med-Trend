@@ -1,3 +1,13 @@
 .vscode
 .env
 LICENSE
+pubmedreq/
+trash/
+
+*.pickle
+*.pkl
+*.csv
+*.json
+*.xlsx
+*.xlx
+*.txt
