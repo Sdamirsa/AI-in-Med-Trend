@@ -16,3 +16,7 @@
 #### Phase Trend: Trend analysis
 
 #### Phase Patent: Linking papers to patents
+
+
+#### Resources to see:
+- [Knowledge Graph Construction](https://www.youtube.com/watch?v=OsnM8YTFwk4) 
