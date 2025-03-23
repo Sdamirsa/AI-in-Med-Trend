@@ -11,3 +11,7 @@ trash/
 *.xlsx
 *.xlx
 *.txt
+
+venv/
+ArchivedCodes/
+Cache_and_Data/
