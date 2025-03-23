@@ -14,4 +14,6 @@ trash/
 
 venv/
 ArchivedCodes/
-Cache_and_Data/
+pubmed_data/
+Code/__pycache__/__init__.cpython-39.pyc
+Code/__pycache__/Pubmed_Retriever.cpython-39.pyc

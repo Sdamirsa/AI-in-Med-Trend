@@ -1,19 +1,71 @@
-# Setting the environment and libraries
-#[cmd]python -m venv pubmedreq
-#[cmd] .\pubmedreq\Scripts\activate
-#%pip install requests
-#%pip install pandas
-#%pip install eutils
+"""
+PubMed data retrieval script.
 
-from Code.Pubmed_Retriver import *
+This script demonstrates how to use the PubMedRetriever class to download
+data from PubMed in optimized batches.
+"""
 
-# Example usage-----
-start_date="1999/01/01"
-end_date="2024/01/01"
-monthly_terms = generate_monthlyterms(start_date=start_date, end_date=end_date)
+#%pip install requests pandas eutils python-dotenv
 
-original_query=r'("1999/01/01"[Date - Publication] : "2024/01/01"[Date - Publication]) AND ("Artificial Intelligence"[Mesh])'
-cache_countfile_path='AIinMed_MountlyCount.pkl'
-Ready4searchs_dic = get_Ready4search_queries(original_query=original_query,cache_countfile_path=cache_countfile_path)
+from Code import PubMedRetriever, create_env_template
+import os
+import sys
+import logging
+from dotenv import load_dotenv
 
-monthlycount_dic = get_monthlycount_using_esearch(original_query=original_query,monthly_terms=monthly_terms, cache_countfile_path=cache_countfile_path)
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+
+def main():
+    """Example usage of the PubMedRetriever class."""
+    # Check for .env file and create template if needed
+    if not os.path.exists('.env'):
+        logger.warning("No .env file found")
+        create_env_template()
+        logger.info("Please fill .env.template with your information and rename to .env")
+        return
+        
+    try:
+        # Load environment variables
+        load_dotenv()
+        
+        # Initialize the retriever
+        retriever = PubMedRetriever()
+        
+        # Example query
+        query = r'"Artificial Intelligence"[Mesh]'
+        start_date = "2000/01/01"
+        end_date = "2025/03/01"
+        
+        logger.info(f"Retrieving data for query: {query} from {start_date} to {end_date}")
+        
+        # Retrieve data using date-based batching
+        results = retriever.retrieve_date_batched_query(
+            base_query=query,
+            start_date=start_date,
+            end_date=end_date,
+            batch_size=500
+        )
+        
+        logger.info(f"Retrieved {results['total_records']} records in {results['total_batches']} batches")
+        
+        # Extract and save structured article data
+        articles = retriever.extract_articles_from_files()
+        retriever.save_articles_to_json(articles, "ai_articles.json")
+        
+    except Exception as e:
+        logger.error(f"Error in main: {e}", exc_info=True)
+
+if __name__ == "__main__":
+    main()
