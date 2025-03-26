@@ -6,12 +6,16 @@
     - [ ] **Step 3:** Extraction (LLM-based) with EXCT module I had
 
 - [ ] **Phase 2**
-    - [ ] **Step 2-1:** How to get large chunk of data (i.e. 500,000) -> Enhancing Step 1-1
-    - [ ] **Step 2-2:** Adding GPT for tagging/cleaning -> Enhancing Step 1-2 and 1-3
     - [ ] **Step 2-3:** Turning this into CSS/HTML page with filtering feature -> Enhancing Step 1-4
 
 - [ ] **Phase RAG**
     - [ ] Applying RAG
+
+- [ ] **Phase Scoring**
+    - [ ] scoring journals (scimago list and score)
+    - [ ] scoring papers (citations, etc)
+    - [ ] scoring authors/institutes (amount of score for each author, corresponding, first)
+    - [ ] scoring clinical speciality (amount of score for each speciality. Probably based on corresponding author speciality/institute)
 
 - [ ] **Phase Trend**
     - [ ] Trend analysis

@@ -19,7 +19,7 @@ import json
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
-
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from langchain_core.prompts import PromptTemplate
@@ -28,11 +28,8 @@ from langchain_openai import AzureChatOpenAI
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
 from langchain_core.messages import AIMessage
-
-from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv()
 
 ##############################
 ###    Helper Functions   ####
@@ -537,7 +534,7 @@ def save_results_to_excel_simple(df, index, experiment_label, EXCT_output_dic):
 ## Main Async Function for Multi-row Run ##
 ###########################################
 
-async def main_async_EXCT_MARIA_multiagent(
+async def EXCT_main(
     excel_file_path: str,
     experiment_label: str,
     Pydantic_Objects_List: List[BaseModel],
@@ -682,3 +679,256 @@ async def main_async_EXCT_MARIA_multiagent(
         # Optionally open the file after saving
         if open_at_end:
             open_excel_file(excel_output_path)
+            
+            
+            
+            
+import asyncio
+import json
+import os
+import time
+from typing import List, Dict, Any, Literal, Union, Optional
+
+# 1) Import the relevant pieces from your existing code:
+#    (Either place this code in the same file, or import these methods
+#     from your S3_EXCT_Function.py)
+#
+#    - async_EXCT_MARIA_multiengine
+#    - The various Pydantic extraction functions
+#    - ensure_azure_env_vars, check_environment_keys, etc. if needed
+
+############################################################
+###  OPTIONAL: Helper function to traverse a path in JSON ###
+############################################################
+
+def get_json_sublist(data: Union[list, dict], path_to_list: List[str]) -> Any:
+    """
+    Given a JSON object (list or dict) and a list of keys (path_to_list),
+    traverse down that path to retrieve a sub-element.
+    
+    Example:
+       data = {"foo": {"bar": [{"name": "Alice"}, {"name": "Bob"}]}}
+       path_to_list = ["foo", "bar"]
+       => returns the list [{"name": "Alice"}, {"name": "Bob"}]
+    """
+    current = data
+    for key in path_to_list:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            raise ValueError(f"Invalid path segment '{key}' in {path_to_list}.")
+    return current
+
+##############################################################
+###  Function to assemble an "EXCT" dictionary from results ###
+##############################################################
+
+def build_exct_dictionary(EXCT_output_dic: dict) -> dict:
+    """
+    Takes the return from async_EXCT_MARIA_multiengine (a dict of
+    {PydanticClassName: {...}}) and creates a single "EXCT" dictionary.
+
+    The user wants:
+      {
+        "EXCT": {
+          "status": "...",
+          "cost": ...,
+          "PydanticClassName1": {...fields...},
+          "PydanticClassName2": {...fields...},
+          ...
+        }
+      }
+
+    We'll set "status" to "EXTRACTED" if everything succeeded or store
+    an error status if something failed. We can also sum up the total cost.
+    Adjust as needed.
+    """
+    exct_data = {}
+    total_cost = 0.0
+    all_good = True
+
+    for pyd_cls_name, result in EXCT_output_dic.items():
+        status = result.get("status", "")
+        experiment_info = result.get("experiment_info", {})
+        response = result.get("response", None)
+
+        # If there's an error in any pydantic object, we can reflect that
+        if not status.startswith("EXTRACTED"):
+            all_good = False
+
+        # Collect cost from experiment_info if present
+        cost_val = experiment_info.get("total_cost", 0.0)
+        if isinstance(cost_val, (int, float)):
+            total_cost += cost_val
+
+        # We store the actual fields from the response if it's a dict or pydantic object
+        # (If using pydantic, you can do response.model_dump() if needed.)
+        if hasattr(response, "model_dump"):
+            exct_data[pyd_cls_name] = response.model_dump()
+        elif isinstance(response, dict):
+            exct_data[pyd_cls_name] = response
+        else:
+            # fallback: store raw
+            exct_data[pyd_cls_name] = {"raw_response": str(response)}
+
+    exct_data["status"] = "EXTRACTED" if all_good else "ERROR"
+    exct_data["cost"] = round(total_cost, 5)
+    return exct_data
+
+#######################################################################
+###  Main Async JSON function that reads JSON, does extraction, and  ###
+###  writes back to "EXCT" in each item                              ###
+#######################################################################
+
+async def EXCT_main(
+    json_file_path: str,
+    text_key: str,
+    Pydantic_Objects_List: List[Any],  # your pydantic classes
+    path_to_list: Optional[List[str]] = None,
+    model_engine: Literal["OpenAI_Async", "Runpod_Async", "AzureOpenAI_Async"] = "OpenAI_Async",
+    parser_error_handling: Literal["include_raw", "llm_to_correct", "manual_logic"] = "llm_to_correct",
+    model: str = 'gpt-3.5-turbo',
+    pre_prompt: str = "",
+    temperature: float = 0,
+    max_tokens: int = 2048,
+    logprobs: bool = False,
+    seed=None,
+    timeout: int = 60,
+    max_retries: int = 2,
+    openai_api_key: str = os.getenv("OPENAI_API_KEY"),
+    runpod_base_url: str = "",
+    runpod_api: str = "",
+    azure_api_key: str = os.getenv("AZURE_OPENAI_API_KEY"),
+    azure_endpoint: str = os.getenv("AZURE_OPENAI_ENDPOINT"),
+    azure_api_version: str = os.getenv("AZURE_API_VERSION"),
+    total_async_n: int = 5,
+    output_file_path: Optional[str] = None,
+) -> None:
+    """
+    1) Loads JSON from 'json_file_path'.
+    2) If path_to_list is provided, we traverse the JSON to that location (which should be a list).
+       If no path is provided, we assume the loaded JSON is itself a list.
+    3) For each item in the list, call the LLM extraction function (async_EXCT_MARIA_multiengine).
+       The text fed to the model is item[text_key].
+    4) The results are collected and stored in item["EXCT"] = { ... }.
+    5) Write the updated JSON to disk (or to 'output_file_path' if given).
+    """
+
+    # --- 1) Read the JSON ---
+    with open(json_file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # --- 2) Locate the list we want to loop over ---
+    if path_to_list:
+        items = get_json_sublist(data, path_to_list)
+        if not isinstance(items, list):
+            raise ValueError("The path_to_list does not point to a list in the JSON.")
+    else:
+        if isinstance(data, list):
+            items = data
+        else:
+            raise ValueError(
+                "No path_to_list was provided, and top-level JSON is not a list."
+            )
+
+    # Prepare asynchronous tasks
+    async_tasks = []
+    async_n = 0
+    last_index = len(items) - 1
+
+    # We'll track results so we can place them back in the item
+    # once tasks complete.
+    for index, item in enumerate(items):
+        # If we already have item["EXCT"], skip or re-run? 
+        # For now, we do not skip—modify as you wish.
+        text_input = item.get(text_key, None)
+        if not text_input:
+            # If there's no text, we can skip or store an error
+            item["EXCT"] = {"status": f"No '{text_key}' found in item."}
+            continue
+
+        task = asyncio.create_task(
+            async_EXCT_MARIA_multiengine(
+                index=index,
+                row=None,  # Not needed for JSON
+                model_engine=model_engine,
+                input_text=text_input,
+                Pydantic_Objects_List=Pydantic_Objects_List,
+                parser_error_handling=parser_error_handling,
+                model=model,
+                pre_prompt=pre_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                logprobs=logprobs,
+                seed=seed,
+                timeout=timeout,
+                max_retries=max_retries,
+                openai_api_key=openai_api_key,
+                runpod_base_url=runpod_base_url,
+                runpod_api=runpod_api,
+                azure_api_key=azure_api_key,
+                azure_endpoint=azure_endpoint,
+                azure_api_version=azure_api_version,
+            )
+        )
+        async_tasks.append(task)
+        async_n += 1
+
+        # We process in batches of total_async_n
+        if async_n == total_async_n or (index == last_index and async_tasks):
+            results = await asyncio.gather(*async_tasks)
+            for res in results:
+                the_index, _, EXCT_output_dic = res
+                # Build the "EXCT" dictionary from the output
+                exct_dict = build_exct_dictionary(EXCT_output_dic)
+                items[the_index]["EXCT"] = exct_dict
+
+            # Reset for next batch
+            async_tasks = []
+            async_n = 0
+
+    # --- 5) Write updated JSON back to file ---
+    if not output_file_path:
+        # If user didn't specify a separate output path, create one
+        base_name, ext = os.path.splitext(json_file_path)
+        output_file_path = f"{base_name}_extracted_{time.strftime('%Y%m%d_%H%M%S')}.json"
+
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    print(f"Extraction completed. Results saved to: {output_file_path}")
+
+
+######################################
+### Example usage (sync entrypoint) ###
+######################################
+# from S3_EXCT_Pydantic import 
+
+def run_extraction_on_json():
+    """
+    Example of how you might call EXCT_main_JSON in a synchronous context.
+    """
+
+    # Suppose your JSON is an array of objects, each object has a "text" field:
+    json_path = r"C:\Users\LEGION\Documents\GIT\AI-in-Med-Trend\pubmed_data_test\cleaned_pubmed_batch_0_3_302a297f_1500_to_1999.json"
+
+    # The user can provide a list of Pydantic classes to use:
+    Pydantic_Objects_List = [
+       
+    ]
+
+    # We run the async method in a sync function for convenience:
+    asyncio.run(
+        EXCT_main_JSON(
+            json_file_path=json_path,
+            Pydantic_Objects_List=Pydantic_Objects_List,
+            text_key="text",       # which key in each object has the text to extract from
+            path_to_list=None,     # if the top-level JSON is already a list
+            model_engine="OpenAI_Async",
+            model="gpt-3.5-turbo",
+            max_tokens=1024,
+            total_async_n=5,
+        )
+    )
+
+

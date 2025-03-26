@@ -22,18 +22,18 @@ import urllib.parse
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+# load_dotenv()
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("pubmed_retriever.log"),
+        logging.FileHandler("S1_DownloadPubmed_main.log"),
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger("PubMedRetriever")
+logger = logging.getLogger("S1_DownloadPubmed_main")
 
 # Constants
 BASE_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
@@ -1078,47 +1078,51 @@ OPENAI_COMPATIBLE_BASE_URL = firwork/otherplatforms-baseurl
         f.write(template_content)
     logger.info("Created .env.template file")
 
-# Example usage
-# def main():
-#     """Example usage of the PubMedRetriever class."""
-#     # Check for .env file and create template if needed
-#     if not os.path.exists('.env'):
-#         logger.warning("No .env file found")
-#         create_env_template()
-#         logger.info("Please fill .env.template with your information and rename to .env")
-#         return
-        
-#     try:
-#         # Load environment variables
-#         load_dotenv()
-        
-#         # Initialize the retriever
-#         retriever = PubMedRetriever()
-        
-#         # Example query
-#         query = r'"Artificial Intelligence"[Mesh]'
-#         start_date = "2020/01/01"
-#         end_date = "2023/12/31"
-        
-#         logger.info(f"Retrieving data for query: {query} from {start_date} to {end_date}")
-        
-#         # Retrieve data using date-based batching
-#         results = retriever.retrieve_date_batched_query(
-#             base_query=query,
-#             start_date=start_date,
-#             end_date=end_date,
-#             batch_size=500
-#         )
-        
-#         logger.info(f"Retrieved {results['total_records']} records in {results['total_batches']} batches")
-        
-#         # Extract and save structured article data
-#         articles = retriever.extract_articles_from_files()
-#         retriever.save_articles_to_json(articles, "ai_articles.json")
-        
-#     except Exception as e:
-#         logger.error(f"Error in main: {e}", exc_info=True)
+def S1_DownloadPubmed_main(query: str, start_date="2000/01/01", end_date="2025/03/01"):
+    """
+    Retrieve data from PubMed using the PubMedRetriever class.
+    args:
+    query: str, the query to be used for retrieving data. For example: '"Artificial Intelligence"[Mesh]'
+    start_date: str, the start date for the query. Default is "2000/01/01"
+    end_date: str, the end date for. the query. Default is "2025/03/01"
+    """
 
-
-# if __name__ == "__main__":
-#     main()
+    # Check for .env file and create template if needed
+    if not os.path.exists('.env'):
+        logger.warning("No .env file found")
+        create_env_template()
+        logger.info("Please fill .env.template with your information and rename to .env")
+        return
+        
+    try:
+        # # Load environment variables
+        # # We already load this at the very begining so we can change them manually, if needed. 
+        # load_dotenv()
+        
+        # Initialize the retriever
+        retriever = PubMedRetriever()
+        
+        # Example query
+        # query = r'"Artificial Intelligence"[Mesh]'
+        # start_date = "2000/01/01"
+        # end_date = "2025/03/01"
+        
+        logger.info(f"Retrieving data for query: {query} from {start_date} to {end_date}")
+        
+        # Retrieve data using date-based batching
+        results = retriever.retrieve_date_batched_query(
+            base_query=query,
+            start_date=start_date,
+            end_date=end_date,
+            batch_size=500
+        )
+        
+        logger.info(f"Retrieved {results['total_records']} records in {results['total_batches']} batches")
+        
+        # Extract and save structured article data
+        # We will keep this for S2
+        # articles = retriever.extract_articles_from_files()
+        # retriever.save_articles_to_json(articles, "ai_articles.json")
+        
+    except Exception as e:
+        logger.error(f"Error in main: {e}", exc_info=True)

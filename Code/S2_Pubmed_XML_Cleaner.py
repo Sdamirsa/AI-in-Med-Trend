@@ -27,7 +27,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("pubmed_parser.log"),
+        logging.FileHandler("S2_Pubmed_XML_Cleaner.log"),
         logging.StreamHandler()
     ]
 )
@@ -769,6 +769,3 @@ def main():
     except Exception as e:
         logger.error(f"Error in main: {e}", exc_info=True)
 
-
-# if __name__ == "__main__":
-#     main()

@@ -11,9 +11,19 @@ trash/
 *.xlsx
 *.xlx
 *.txt
+*.log
 
 venv/
 ArchivedCodes/
 pubmed_data/
+pubmed_data_test/
 Code/__pycache__/__init__.cpython-39.pyc
 Code/__pycache__/Pubmed_Retriever.cpython-39.pyc
+pubmed_retriever.log
+Code/__pycache__/Pubmed_XML_Cleaner.cpython-39.pyc
+Code/__pycache__/S1_Pubmed_Retriever.cpython-39.pyc
+Code/__pycache__/S2_Prepare_and_ManualLabels.cpython-39.pyc
+Code/__pycache__/S2_Pubmed_XML_Cleaner_processor.cpython-39.pyc
+Code/__pycache__/S2_Pubmed_XML_Cleaner.cpython-39.pyc
+Code/__pycache__/S3_EXCT_Function.cpython-39.pyc
+pubmed_retriever.log

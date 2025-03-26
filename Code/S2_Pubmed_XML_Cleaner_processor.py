@@ -4,6 +4,8 @@ PubMed XML Batch Cleaner
 This script processes all PubMed batch files in the cache directory,
 extracts and cleans the XML data, and saves the cleaned data with
 a "cleaned_" prefix in the same directory.
+
+Enviroment variables used: COMBINE_ALL_AFTER_S2
 """
 
 import os
@@ -12,21 +14,73 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import List, Dict, Any
-from Code.Pubmed_XML_Cleaner import PubMedXMLCleaner
+from Code.S2_Pubmed_XML_Cleaner import PubMedXMLCleaner
 
 # Load environment variables
-load_dotenv()
+# load_dotenv()
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("batch_cleaner.log"),
+        logging.FileHandler("S2_Pubmed_XML_Cleaner_processor.log"),
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger("BatchCleaner")
+logger = logging.getLogger("S2_Cleaner_processor_main")
+def create_and_copy_folder(source_name, destination_folder):
+    """
+    Creates a destination folder and copies contents from a source folder,
+    only transferring files that do not already exist in the destination.
+    
+    Args:
+        source_name: The name of the source folder
+        destination_folder: The path to the destination folder
+    
+    Returns:
+        Path: The path to the destination folder
+    """
+    import os
+    import shutil
+    from pathlib import Path
+    
+    # Turning source_name into a Path object
+    source_folder = Path(source_name)
+    destination_folder = Path(destination_folder)
+    
+    # Check if the destination is inside the source
+    is_subdirectory = False
+    try:
+        is_subdirectory = destination_folder.resolve().is_relative_to(source_folder.resolve())
+    except Exception:
+        # For Python < 3.9 compatibility or other path resolution errors
+        pass
+    
+    # Create the destination directory if it doesn't exist
+    if not destination_folder.exists():
+        destination_folder.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created destination directory: {destination_folder}")
+    
+    # Copy contents from source to destination
+    if source_folder.exists():
+        for item in source_folder.glob('*'):
+            # Skip if the item is the destination folder
+            if is_subdirectory and destination_folder.name == item.name:
+                logger.info(f"Skipping destination folder: {item}")
+                continue
+                
+            dest_item = destination_folder / item.name
+            if item.is_file() and not dest_item.exists():
+                shutil.copy2(item, dest_item)
+                logger.info(f"Copied file {item} to {dest_item}")
+            elif item.is_dir() and not dest_item.exists():
+                shutil.copytree(item, dest_item, dirs_exist_ok=True)
+                logger.info(f"Copied directory {item} to {dest_item}")
+    else:
+        logger.warning(f"Source directory {source_folder} does not exist")
+    
+    return destination_folder
 
 def find_batch_files(cache_dir: str) -> List[str]:
     """
@@ -122,40 +176,6 @@ def process_batch_file(file_path: str, cleaner: PubMedXMLCleaner) -> str:
         logger.error(f"Error processing {file_path}: {e}", exc_info=True)
         return ""
 
-def main():
-    """Process all PubMed batch files in the cache directory."""
-    try:
-        # Get cache directory from environment variable
-        cache_dir = os.getenv("CACHE_DIRECTORY", "pubmed_data")
-        
-        # Create the directory if it doesn't exist
-        os.makedirs(cache_dir, exist_ok=True)
-        
-        # Find all batch files
-        batch_files = find_batch_files(cache_dir)
-        if not batch_files:
-            logger.warning("No batch files found to process")
-            return
-        
-        # Initialize the cleaner
-        cleaner = PubMedXMLCleaner(data_dir=cache_dir)
-        
-        # Process each batch file
-        processed_files = []
-        for file_path in batch_files:
-            cleaned_path = process_batch_file(file_path, cleaner)
-            if cleaned_path:
-                processed_files.append(cleaned_path)
-        
-        logger.info(f"Successfully processed {len(processed_files)} of {len(batch_files)} batch files")
-        
-        # Optionally combine all cleaned data into one file
-        combine_all = os.getenv("COMBINE_ALL_CLEANED", "false").lower() == "true"
-        if combine_all and processed_files:
-            combine_cleaned_files(cache_dir, processed_files)
-        
-    except Exception as e:
-        logger.error(f"Error in main: {e}", exc_info=True)
 
 def combine_cleaned_files(cache_dir: str, file_paths: List[str]) -> str:
     """
@@ -197,6 +217,38 @@ def combine_cleaned_files(cache_dir: str, file_paths: List[str]) -> str:
     except Exception as e:
         logger.error(f"Error combining files: {e}", exc_info=True)
         return ""
-
-if __name__ == "__main__":
-    main()
+    
+    
+def S2_Cleaner_processor_main(data_dir, combine_all = os.getenv("COMBINE_ALL_AFTER_S2", "false").lower() == "true"):
+    """Process all PubMed batch files in the cache directory."""
+    
+    if combine_all:
+        logger.info(f"The COMBINE_ALL_AFTER_S2 set to True. Will combine all jsons into one, as well as saving the cleaned output in each json.")
+    try:  
+        # Create the directory if it doesn't exist
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # Find all batch files
+        batch_files = find_batch_files(data_dir)
+        if not batch_files:
+            logger.warning("No batch files found to process")
+            return
+        
+        # Initialize the cleaner
+        cleaner = PubMedXMLCleaner(data_dir=data_dir)
+        
+        # Process each batch file
+        processed_files = []
+        for file_path in batch_files:
+            cleaned_path = process_batch_file(file_path, cleaner)
+            if cleaned_path:
+                processed_files.append(cleaned_path)
+        
+        logger.info(f"Successfully processed {len(processed_files)} of {len(batch_files)} batch files")
+        
+        # Optionally combine all cleaned data into one file
+        if combine_all and processed_files:
+            combine_cleaned_files(data_dir, processed_files)
+        
+    except Exception as e:
+        logger.error(f"Error in main: {e}", exc_info=True)
