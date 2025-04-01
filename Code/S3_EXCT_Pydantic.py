@@ -3,7 +3,7 @@ from typing import List, Optional
 from enum import Enum
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal
 from enum import Enum
 
 
@@ -288,25 +288,143 @@ class Evaluation(BaseModel):
 # 8) ENUMERATIONS
 ############################################################
 
-class TRIPODField(str, Enum):
-    TITLE_MODEL_DEVELOPMENT = "Title - mention of developing or evaluating prediction model"
-    TITLE_TARGET_POPULATION = "Title - mention target population"
-    TITLE_OUTCOME_TO_PREDICT = "Title - mention outcome to predict"
-    BACKGROUND_HEALTHCARE_CONTEXT = "Background - a brief explanation of the healthcare context and rationale for developing or evaluating"
-    OBJECTIVE_STUDY_TYPE = "Objective - describe object and whether the study is development, evaluation, or both"
-    METHOD_SOURCE_OF_DATA = "Method - Source of data"
-    METHOD_ELIGIBILITY_CRITERIA = "Method - eligibility criteria"
-    METHOD_OUTCOME_PREDICTED = "Method - outcome to be predicted"
-    METHOD_OUTCOME_TIME_HORIZON = "Method - outcome time horizon if relevant (prognostic)"
-    METHOD_MODEL_TYPE = "Method - Model type"
-    METHOD_MODEL_BUILDING_STEPS = "Method - model building steps"
-    METHOD_VALIDATION_METHOD = "Method - method for validation"
-    METHOD_MEASURES_FOR_MODEL_PERFORMANCE = "Method - measures used to assess model performance"
-    RESULT_PARTICIPANTS_OUTCOME_EVENTS = "Result - number of participants and outcome events"
-    RESULT_PREDICTORS_IN_FINAL_MODEL = "Result - summary of predictors in the final model"
-    RESULT_MODEL_PERFORMANCE_ESTIMATE = "Result - model performance estimate"
-    RESULT_MODEL_PERFORMANCE_CI = "Result - model performance confidence interval"
-    REGISTRATION_NUMBER_REPOSITORY = "Registration - give the registration number or repository"
+class TRIPODChecklist(BaseModel):
+    """
+    This model tracks the TRIPOD-AI checklist items for a scientific article.
+    Each item is a boolean indicating whether the corresponding element
+    is mentioned (True) or not mentioned (False) in the article's abstract.
+    """
+
+    title_model_development: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the title explicitly mentions developing or "
+            "evaluating a multivariable prediction model."
+        )
+    )
+    title_target_population: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the title specifies the population or patient "
+            "group for which the model is intended."
+        )
+    )
+    title_outcome_to_predict: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the title identifies the outcome the model aims "
+            "to predict."
+        )
+    )
+    background_healthcare_context: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract provides a brief rationale and "
+            "healthcare context for why the model is being developed or "
+            "evaluated."
+        )
+    )
+    objective_study_type: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract clearly states the study's objective(s), "
+            "including whether it is focused on model development, evaluation, or both."
+        )
+    )
+    method_source_of_data: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract describes where the data originated, "
+            "such as clinical records, databases, or registries."
+        )
+    )
+    method_eligibility_criteria: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract outlines the criteria used to include "
+            "or exclude participants from the study."
+        )
+    )
+    method_outcome_predicted: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract specifies the primary outcome the "
+            "model is intended to predict."
+        )
+    )
+    method_outcome_time_horizon: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract mentions the time frame for which "
+            "the outcome is being predicted, particularly for prognostic models "
+            "(e.g., 30-day mortality)."
+        )
+    )
+    method_model_type: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract identifies the type of prediction model "
+            "used (e.g., logistic regression, random forest, neural network)."
+        )
+    )
+    method_model_building_steps: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract summarizes how the model was built, "
+            "including steps such as feature selection or parameter tuning."
+        )
+    )
+    method_validation_method: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract describes how the model was validated, "
+            "such as internal validation (cross-validation, bootstrapping) or "
+            "external validation (independent dataset)."
+        )
+    )
+    method_measures_for_model_performance: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract specifies which metrics were used to "
+            "evaluate the model's performance (e.g., accuracy, AUC, calibration, "
+            "decision curve analysis)."
+        )
+    )
+    result_participants_outcome_events: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract reports the sample size (number of "
+            "participants) and the count of outcome events."
+        )
+    )
+    result_predictors_in_final_model: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract lists or summarizes the predictors "
+            "included in the final model."
+        )
+    )
+    result_model_performance_estimate: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract reports a measure of the model's "
+            "performance (e.g., AUC value, sensitivity, specificity)."
+        )
+    )
+    result_model_performance_ci: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract includes confidence intervals or "
+            "another form of uncertainty estimate for the model's performance metrics."
+        )
+    )
+    registration_number_repository: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract provides a registration number (e.g., "
+            "ClinicalTrials.gov) or mentions a data/model repository."
+        )
+    )
 
 class TimeUnit(str, Enum):
     MINUTES = "minutes"
@@ -324,11 +442,17 @@ class AIRelevanceCheck(BaseModel):
     """
     This model handles checking whether the article is related to AI in medicine.
     """
-    is_related_to_ai_in_medicine: bool = Field(
+    related_to_clinical_medicine: bool = Field(
         ...,
-        description="Is this article related to Artificial Intelligence in Medicine?"
+        description="Is this article related to clinical medicine and medical practice?"
     )
-    exclusion_reason: Optional[str] = Field(
+    related_to_artificial_intelligence: bool = Field(
+        ...,
+        description="Is this article related to artificial intelligence?"
+    )
+    
+    
+    exclusion_reason: Literal["not_related_to_clinical_medicine", "not_related_to_artificial_intelligence"] = Field(
         None,
         description="Reason for exclusion if the paper is not related to AI in Medicine."
     )
@@ -340,28 +464,141 @@ class AIRelevanceCheck(BaseModel):
 
 class TRIPODChecklist(BaseModel):
     """
-    This model tracks the TRIPOD-AI checklist items for the paper.
-    Each item corresponds to a boolean indicating whether it's mentioned in the abstract.
+    This model tracks the TRIPOD-AI checklist items for a scientific article.
+    Each item is a boolean indicating whether the corresponding element
+    is mentioned (True) or not mentioned (False) in the article's abstract.
     """
-    title_model_development: bool = Field(..., description="Title - mention of developing or evaluating prediction model")
-    title_target_population: bool = Field(..., description="Title - mention target population")
-    title_outcome_to_predict: bool = Field(..., description="Title - mention outcome to predict")
-    background_healthcare_context: bool = Field(..., description="Background - a brief explanation of the healthcare context and rationale for developing or evaluating")
-    objective_study_type: bool = Field(..., description="Objective - describe object and whether the study is development, evaluation or both")
-    method_source_of_data: bool = Field(..., description="Method - Source of data")
-    method_eligibility_criteria: bool = Field(..., description="Method - eligibility criteria")
-    method_outcome_predicted: bool = Field(..., description="Method - outcome to be predicted")
-    method_outcome_time_horizon: bool = Field(..., description="Method - outcome time horizon if relevant (prognostic)")
-    method_model_type: bool = Field(..., description="Method - Model type")
-    method_model_building_steps: bool = Field(..., description="Method - model building steps")
-    method_validation_method: bool = Field(..., description="Method - method for validation")
-    method_measures_for_model_performance: bool = Field(..., description="Method - measures used to assess model performance")
-    result_participants_outcome_events: bool = Field(..., description="Result - number of participants and outcome events")
-    result_predictors_in_final_model: bool = Field(..., description="Result - summary of predictors in the final model")
-    result_model_performance_estimate: bool = Field(..., description="Result - model performance estimate")
-    result_model_performance_ci: bool = Field(..., description="Result - model performance confidence interval")
-    registration_number_repository: bool = Field(..., description="Registration - give the registration number or repository")
 
+    title_model_development: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the title explicitly mentions developing or "
+            "evaluating a multivariable prediction model."
+        )
+    )
+    title_target_population: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the title specifies the population or patient "
+            "group for which the model is intended."
+        )
+    )
+    title_outcome_to_predict: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the title identifies the outcome the model aims "
+            "to predict."
+        )
+    )
+    background_healthcare_context: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract provides a brief rationale and "
+            "healthcare context for why the model is being developed or "
+            "evaluated."
+        )
+    )
+    objective_study_type: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract clearly states the study's objective(s), "
+            "including whether it is focused on model development, evaluation, or both."
+        )
+    )
+    method_source_of_data: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract describes where the data originated, "
+            "such as clinical records, databases, or registries."
+        )
+    )
+    method_eligibility_criteria: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract outlines the criteria used to include "
+            "or exclude participants from the study."
+        )
+    )
+    method_outcome_predicted: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract specifies the primary outcome the "
+            "model is intended to predict."
+        )
+    )
+    method_outcome_time_horizon: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract mentions the time frame for which "
+            "the outcome is being predicted, particularly for prognostic models "
+            "(e.g., 30-day mortality)."
+        )
+    )
+    method_model_type: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract identifies the type of prediction model "
+            "used (e.g., logistic regression, random forest, neural network)."
+        )
+    )
+    method_model_building_steps: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract summarizes how the model was built, "
+            "including steps such as feature selection or parameter tuning."
+        )
+    )
+    method_validation_method: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract describes how the model was validated, "
+            "such as internal validation (cross-validation, bootstrapping) or "
+            "external validation (independent dataset)."
+        )
+    )
+    method_measures_for_model_performance: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract specifies which metrics were used to "
+            "evaluate the model's performance (e.g., accuracy, AUC, calibration, "
+            "decision curve analysis)."
+        )
+    )
+    result_participants_outcome_events: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract reports the sample size (number of "
+            "participants) and the count of outcome events."
+        )
+    )
+    result_predictors_in_final_model: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract lists or summarizes the predictors "
+            "included in the final model."
+        )
+    )
+    result_model_performance_estimate: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract reports a measure of the model's "
+            "performance (e.g., AUC value, sensitivity, specificity)."
+        )
+    )
+    result_model_performance_ci: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract includes confidence intervals or "
+            "another form of uncertainty estimate for the model's performance metrics."
+        )
+    )
+    registration_number_repository: bool = Field(
+        ...,
+        description=(
+            "Indicates whether the abstract provides a registration number (e.g., "
+            "ClinicalTrials.gov) or mentions a data/model repository."
+        )
+    )
 
 ############################################################
 # 4) FULL PUBLISHING MODEL FOR THE AI STUDY
@@ -397,19 +634,19 @@ class AIStudy(BaseModel):
                     "background_healthcare_context": True,
                     "objective_study_type": True,
                     "method_source_of_data": True,
-                    "method_eligibility_criteria": True,
+                    "method_eligibility_criteria": False,
                     "method_outcome_predicted": True,
                     "method_outcome_time_horizon": True,
                     "method_model_type": True,
-                    "method_model_building_steps": True,
+                    "method_model_building_steps": False,
                     "method_validation_method": True,
-                    "method_measures_for_model_performance": True,
+                    "method_measures_for_model_performance": False,
                     "result_participants_outcome_events": True,
                     "result_predictors_in_final_model": True,
                     "result_model_performance_estimate": True,
                     "result_model_performance_ci": True,
-                    "registration_number_repository": True
-                },
+                    "registration_number_repository": False
+                        },
                 "enrollment": {
                     "target_population": ["patients with diabetes"],
                     "target_disease": ["Type 2 diabetes"],

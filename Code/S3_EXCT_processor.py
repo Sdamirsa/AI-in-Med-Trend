@@ -4,7 +4,6 @@ import time
 import asyncio
 from typing import Optional, Dict, Any
 from .S3_EXCT_Function import EXCT_main
-from .S3_EXCT_
 
 # Make sure these imports/definitions exist somewhere in your code:
 # from your_file import EXCT_main, get_json_sublist, build_exct_dictionary
@@ -18,13 +17,13 @@ def S3_EXCT_processor_main(
     """
     Iterates over JSON files in 'folder_path'. For each file whose name starts 
     with 'filter_startstring', calls the async EXCT_main function. Merges 
-    EXCT_main_kwargs_dictionary with the necessary arguments (json_file_path 
+    EXCT_main_kwargs_dictionary with the necessary arguments (except for json_file_path 
     and output_file_path).
     
     If 'add_string_at_beginning' is empty, overwrites the original file. 
     Otherwise, prefixes the new filename with add_string_at_beginning.
     """
-
+    firsttime_to_warn_path_change = True
     # List all files in the specified folder
     for filename in os.listdir(folder_path):
         # We only process .json files that start with filter_startstring
@@ -41,8 +40,18 @@ def S3_EXCT_processor_main(
 
             # Prepare kwargs for EXCT_main by merging user-provided dictionary
             exct_kwargs = dict(EXCT_main_kwargs_dictionary)
+            
+            if firsttime_to_warn_path_change ((len(exct_kwargs["json_file_path"]) > 0) or (len(exct_kwargs["output_file_path"]) > 0)):
+                print(f"Overwrite your provided 'json_file_path' and 'output_file_path' with the new ones. \n")
+                print(f"json_file_path: {exct_kwargs['json_file_path']}")
+                print(f"output_file_path: {exct_kwargs['output_file_path']} \n")
+                firsttime_to_warn_path_change =  False
+                
             exct_kwargs["json_file_path"] = input_file_path
             exct_kwargs["output_file_path"] = output_file_path
+            
+
+
 
             # Now call EXCT_main in a synchronous context using asyncio.run
             asyncio.run(EXCT_main(**exct_kwargs))
@@ -53,11 +62,14 @@ def S3_EXCT_processor_main(
 # ------------------------------------------------------------------------
 # Example usage
 # ------------------------------------------------------------------------
+# from .S3_EXCT_Pydantic import * # to import all pydantic models and sub-classes
+# from .S3_EXCT_Pydantic import AIStudy #the main pydantic class
+
 # if __name__ == "__main__":
 #     # Suppose you have a dictionary of all other EXCT_main parameters:
 #     exct_params = {
 #         "text_key": "abstract", 
-#         "Pydantic_Objects_List": [],  # your pydantic models
+#         "Pydantic_Objects_List": [AIStudy],  # your pydantic models
 #         "path_to_list": None,
 #         "model_engine": "OpenAI_Async",
 #         "parser_error_handling": "llm_to_correct",

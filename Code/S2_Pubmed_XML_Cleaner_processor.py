@@ -19,6 +19,18 @@ from Code.S2_Pubmed_XML_Cleaner import PubMedXMLCleaner
 # Load environment variables
 # load_dotenv()
 
+# Determine the appropriate tqdm import based on the execution environment
+from IPython import get_ipython
+try:
+    shell = get_ipython().__class__.__name__
+    if shell == 'ZMQInteractiveShell':  # Jupyter Notebook or qtconsole
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except NameError:
+    # Standard Python interpreter
+    from tqdm import tqdm
+    
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -29,57 +41,107 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("S2_Cleaner_processor_main")
+
 def create_and_copy_folder(source_name, destination_folder):
     """
     Creates a destination folder and copies contents from a source folder,
     only transferring files that do not already exist in the destination.
-    
+
+    If the destination is a subdirectory of the source folder, we handle the copy
+    by first copying the source folder to a temporary folder outside of the source,
+    and then copying from that temporary folder into the subdirectory. This avoids
+    infinite recursion.
+
     Args:
-        source_name: The name of the source folder
+        source_name: The name or path of the source folder
         destination_folder: The path to the destination folder
-    
+
     Returns:
         Path: The path to the destination folder
     """
     import os
     import shutil
     from pathlib import Path
-    
-    # Turning source_name into a Path object
+    import logging
+    import tempfile
+
+    logger = logging.getLogger(__name__)
+
+    # Convert input parameters to Path objects
     source_folder = Path(source_name)
     destination_folder = Path(destination_folder)
-    
-    # Check if the destination is inside the source
+
+    # Check whether the destination folder is inside the source folder
     is_subdirectory = False
     try:
+        # `is_relative_to` is available in Python 3.9+
         is_subdirectory = destination_folder.resolve().is_relative_to(source_folder.resolve())
     except Exception:
-        # For Python < 3.9 compatibility or other path resolution errors
+        # For Python < 3.9 or any path resolution errors, do nothing
         pass
-    
-    # Create the destination directory if it doesn't exist
+
+    # If the destination is a subdirectory, handle by copying via a temporary folder
+    if is_subdirectory:
+        logger.warning(
+            f"Destination folder '{destination_folder}' is a subdirectory of the source '{source_folder}'. "
+            "Copying via a temporary directory to avoid any infinite recursion issues."
+        )
+        # Create a temporary directory outside the source, copy there first, then copy to destination
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # Copy from source to the temporary directory
+            if source_folder.exists():
+                for item in source_folder.glob('*'):
+                    if item.is_file():
+                        shutil.copy2(item, tmp_path / item.name)
+                    elif item.is_dir():
+                        shutil.copytree(item, tmp_path / item.name, dirs_exist_ok=True)
+            else:
+                logger.warning(f"Source directory {source_folder} does not exist")
+                return destination_folder
+
+            # Now copy from the temp directory to the real destination
+            if not destination_folder.exists():
+                destination_folder.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created destination directory: {destination_folder}")
+
+            for item in tmp_path.glob('*'):
+                dest_item = destination_folder / item.name
+                if item.is_file() and not dest_item.exists():
+                    shutil.copy2(item, dest_item)
+                    logger.info(f"Copied file {item} to {dest_item}")
+                elif item.is_dir() and not dest_item.exists():
+                    shutil.copytree(item, dest_item, dirs_exist_ok=True)
+                    logger.info(f"Copied directory {item} to {dest_item}")
+
+        return destination_folder
+
+    # If the destination is not a subdirectory, do a direct copy
     if not destination_folder.exists():
         destination_folder.mkdir(parents=True, exist_ok=True)
         logger.info(f"Created destination directory: {destination_folder}")
-    
-    # Copy contents from source to destination
+
     if source_folder.exists():
         for item in source_folder.glob('*'):
-            # Skip if the item is the destination folder
-            if is_subdirectory and destination_folder.name == item.name:
+            # Skip if this item is the destination folder itself (prevents infinite recursion)
+            if item.resolve() == destination_folder.resolve():
                 logger.info(f"Skipping destination folder: {item}")
                 continue
-                
+
             dest_item = destination_folder / item.name
+
+            # Copy files that do not exist in the destination
             if item.is_file() and not dest_item.exists():
                 shutil.copy2(item, dest_item)
                 logger.info(f"Copied file {item} to {dest_item}")
+
+            # Copy directories that do not exist in the destination
             elif item.is_dir() and not dest_item.exists():
                 shutil.copytree(item, dest_item, dirs_exist_ok=True)
                 logger.info(f"Copied directory {item} to {dest_item}")
     else:
         logger.warning(f"Source directory {source_folder} does not exist")
-    
+
     return destination_folder
 
 def find_batch_files(cache_dir: str) -> List[str]:
@@ -219,12 +281,13 @@ def combine_cleaned_files(cache_dir: str, file_paths: List[str]) -> str:
         return ""
     
     
-def S2_Cleaner_processor_main(data_dir, combine_all = os.getenv("COMBINE_ALL_AFTER_S2", "false").lower() == "true"):
-    """Process all PubMed batch files in the cache directory."""
+def S2_Cleaner_processor_main(data_dir, combine_all=os.getenv("COMBINE_ALL_AFTER_S2", "false").lower() == "true"):
+    """Process all PubMed batch files in the cache directory with a progress bar."""
     
     if combine_all:
-        logger.info(f"The COMBINE_ALL_AFTER_S2 set to True. Will combine all jsons into one, as well as saving the cleaned output in each json.")
-    try:  
+        logger.info("The COMBINE_ALL_AFTER_S2 flag is set to True. Will combine all jsons into one, as well as saving the cleaned output in each json.")
+    
+    try:
         # Create the directory if it doesn't exist
         os.makedirs(data_dir, exist_ok=True)
         
@@ -236,10 +299,10 @@ def S2_Cleaner_processor_main(data_dir, combine_all = os.getenv("COMBINE_ALL_AFT
         
         # Initialize the cleaner
         cleaner = PubMedXMLCleaner(data_dir=data_dir)
-        
-        # Process each batch file
+
+        # Process each batch file with a progress bar
         processed_files = []
-        for file_path in batch_files:
+        for file_path in tqdm(batch_files, desc="Processing batch files"):
             cleaned_path = process_batch_file(file_path, cleaner)
             if cleaned_path:
                 processed_files.append(cleaned_path)

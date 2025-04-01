@@ -19,11 +19,23 @@ from typing import Dict, List, Optional, Tuple, Union, Any, Set
 
 import requests
 import urllib.parse
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 # Load environment variables from .env file
 # load_dotenv()
 
+# Determine the appropriate tqdm import based on the execution environment
+from IPython import get_ipython
+try:
+    shell = get_ipython().__class__.__name__
+    if shell == 'ZMQInteractiveShell':  # Jupyter Notebook or qtconsole
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except NameError:
+    # Standard Python interpreter
+    from tqdm import tqdm
+    
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -603,7 +615,8 @@ class PubMedRetriever:
         }
         
         # Process each optimized query
-        for query_info in optimized_queries:
+        for query_info in tqdm(optimized_queries, desc="Processingoptimized_queries"):
+            
             query = query_info["query"]
             count = query_info["count"]
             batch_id = query_info["batch_id"]

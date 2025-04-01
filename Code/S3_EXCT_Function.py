@@ -780,7 +780,7 @@ def build_exct_dictionary(EXCT_output_dic: dict) -> dict:
 ###  writes back to "EXCT" in each item                              ###
 #######################################################################
 
-async def EXCT_main(
+async def EXCT_main_JSON(
     json_file_path: str,
     text_key: str,
     Pydantic_Objects_List: List[Any],  # your pydantic classes
@@ -904,18 +904,18 @@ async def EXCT_main(
 ######################################
 # from S3_EXCT_Pydantic import 
 
-def run_extraction_on_json():
+from .S3_EXCT_Pydantic import * # to import all pydantic models and sub-classes
+from .S3_EXCT_Pydantic import AIStudy #the main pydantic class
+def test_run_extraction_on_json():
     """
     Example of how you might call EXCT_main_JSON in a synchronous context.
     """
-
+    
     # Suppose your JSON is an array of objects, each object has a "text" field:
     json_path = r"C:\Users\LEGION\Documents\GIT\AI-in-Med-Trend\pubmed_data_test\cleaned_pubmed_batch_0_3_302a297f_1500_to_1999.json"
-
+    
     # The user can provide a list of Pydantic classes to use:
-    Pydantic_Objects_List = [
-       
-    ]
+    Pydantic_Objects_List = [AIStudy]
 
     # We run the async method in a sync function for convenience:
     asyncio.run(
@@ -925,8 +925,8 @@ def run_extraction_on_json():
             text_key="text",       # which key in each object has the text to extract from
             path_to_list=None,     # if the top-level JSON is already a list
             model_engine="OpenAI_Async",
-            model="gpt-3.5-turbo",
-            max_tokens=1024,
+            model="gpt-4omini",
+            max_tokens=2048,
             total_async_n=5,
         )
     )

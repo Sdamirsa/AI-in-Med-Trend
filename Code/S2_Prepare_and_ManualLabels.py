@@ -2,6 +2,19 @@ import json
 import os
 import logging
 
+# Determine the appropriate tqdm import based on the execution environment
+from IPython import get_ipython
+try:
+    shell = get_ipython().__class__.__name__
+    if shell == 'ZMQInteractiveShell':  # Jupyter Notebook or qtconsole
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except NameError:
+    # Standard Python interpreter
+    from tqdm import tqdm
+    
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -22,18 +35,18 @@ def prepare_llm_input(article_info: dict) -> str:
     """
     title = article_info.get("title", "")
     abstract = article_info.get("abstract", "")
-    publication_types = article_info.get("publication_types", [])
+    # publication_types = article_info.get("publication_types", [])
 
     # Publication types as a comma-separated string
-    publication_types_str = ", ".join(
-        pub_type.get("type", "") for pub_type in publication_types
-    )
+    # publication_types_str = ", ".join(
+    #     pub_type.get("type", "") for pub_type in publication_types
+    # )
 
     # Create a formatted string for the LLM input
     llm_input = (
         f"# Title:\n{title}\n\n"
         f"# Abstract:\n{abstract}\n\n"
-        f"# Publication Types:\n{publication_types_str}\n\n"
+        # f"# Publication Types:\n{publication_types_str}\n\n"
     )
 
     return llm_input
@@ -195,7 +208,7 @@ def S2_prepare_and_label_main(
         and save the processed result under that new name.
     """
     # List all files in the specified folder
-    for filename in os.listdir(folder_path):
+    for filename in tqdm(os.listdir(folder_path), desc="Processing files"): 
         # We only process .json files that match the filter_substring
         if filename.endswith(".json") and filename.startswith(filter_startstring):
             file_path = os.path.join(folder_path, filename)
